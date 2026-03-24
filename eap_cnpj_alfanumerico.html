@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Executivo - EAP CNPJ Alfa</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        /* --- ESTILOS GLOBAIS --- */
+        body { 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; 
+            background-color: #f4f5f7; color: #172b4d; overflow-x: hidden;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px); background-size: 20px 20px;
+        }
+
+        /* --- DASHBOARD EXECUTIVO --- */
+        .header-wrapper { position: sticky; top: 0; left: 0; width: 100%; z-index: 2000; padding: 15px 20px; box-sizing: border-box; pointer-events: none; }
+        
+        .dashboard {
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 12px; padding: 20px 25px; box-shadow: 0 8px 30px rgba(9, 30, 66, 0.08);
+            display: flex; flex-direction: column; gap: 15px; max-width: 1400px; margin: 0 auto; pointer-events: auto;
+        }
+
+        .dash-top { display: flex; justify-content: space-between; align-items: center; }
+        
+        .dash-brand h1 { margin: 0; font-size: 20px; font-weight: 800; color: #172b4d; letter-spacing: -0.5px;}
+        .dash-brand p { margin: 0; font-size: 11px; color: #5e6c84; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;}
+
+        /* Barra de Toggle (Macro/Micro) */
+        .view-toggle { display: flex; background: #ebecf0; border-radius: 8px; padding: 4px; position: relative; }
+        .view-toggle button { background: transparent; border: none; color: #5e6c84; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; transition: all 0.3s ease; z-index: 2; width: 130px; }
+        .view-toggle button.active { color: #0052cc; }
+        .toggle-bg { position: absolute; top: 4px; left: 4px; height: calc(100% - 8px); width: 130px; background: white; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1; }
+
+        /* Status & Números Dinâmicos */
+        .dash-bottom { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ebecf0; padding-top: 15px;}
+        .dash-stats { display: flex; gap: 20px; align-items: center; }
+        
+        .stat-item { display: flex; flex-direction: column; padding-left: 20px; border-left: 2px solid #ebecf0;}
+        .stat-item:first-child { border-left: none; padding-left: 0;}
+        .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #5e6c84; font-weight: 700; margin-bottom: 2px;}
+        .stat-value { font-size: 22px; font-weight: 800; color: #172b4d; line-height: 1;}
+        
+        .val-admin { color: #00875a; } .val-app { color: #6554c0; }
+        .val-dev { color: #0052cc; } .val-qa { color: #ff5630; }
+
+        /* Gráfico de Barra Dev/QA */
+        .progress-wrapper { width: 220px; margin-left: 15px;}
+        .progress-bar { height: 8px; background: #ebecf0; border-radius: 4px; display: flex; overflow: hidden; margin-top: 5px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);}
+        .prog-dev { background: #0052cc; height: 100%; transition: width 1s ease-out;}
+        .prog-qa { background: #ff5630; height: 100%; transition: width 1s ease-out;}
+        .progress-labels { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; margin-top: 4px;}
+
+        /* Botões de Ação */
+        .action-buttons { display: flex; gap: 8px; }
+        .btn-action { background: #0052cc; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 0 rgba(0,82,204,0.3);}
+        .btn-action:hover { background: #0065ff; transform: translateY(-1px); }
+        .btn-action:active { transform: translateY(1px); box-shadow: none; }
+        .btn-secondary { background: white; border: 1px solid #dfe1e6; color: #42526e; box-shadow: 0 1px 2px rgba(9,30,66,0.05); padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;}
+        .btn-secondary:hover { background: #f4f5f7; }
+
+        /* --- CONTAINERS GERAIS --- */
+        .view-container { display: none; opacity: 0; transition: opacity 0.4s ease; }
+        .view-container.active { display: block; opacity: 1; }
+
+        /* =========================================
+           VISÃO MACRO (DIAGRAMA)
+           ========================================= */
+        #view-macro { width: 100vw; height: calc(100vh - 130px); overflow: hidden; cursor: grab; position: relative; margin-top: -130px; box-sizing: border-box; }
+        #view-macro.grabbing { cursor: grabbing; }
+        #diagram-canvas { transform-origin: 0 0; transition: transform 0.1s ease-out; position: absolute; left: 0; top: 160px; padding: 20px 40px 100px 40px;}
+
+        .tree ul { padding-top: 25px; position: relative; display: flex; justify-content: center; padding-left: 0; margin: 0; }
+        .tree li { text-align: center; list-style-type: none; position: relative; padding: 25px 8px 0 8px; display: flex; flex-direction: column; align-items: center;}
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid #b3bac5; width: 50%; height: 25px; z-index: -1;}
+        .tree li::after { right: auto; left: 50%; border-left: 2px solid #b3bac5; }
+        .tree li:only-child::after, .tree li:only-child::before { display: none; }
+        .tree li:only-child { padding-top: 0; }
+        .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+        .tree li:first-child::after { border-radius: 8px 0 0 0; }
+        .tree li:last-child::before { border-right: 2px solid #b3bac5; border-radius: 0 8px 0 0; }
+        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid #b3bac5; width: 0; height: 25px; z-index: -1;}
+
+        .node { background: white; border-radius: 8px; padding: 14px; display: inline-block; text-align: left; box-shadow: 0 6px 12px rgba(9,30,66,0.06); position: relative; border-top: 5px solid #ccc; min-width: 230px; box-sizing: border-box; }
+        .node-header { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; color: #172b4d; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #ebecf0;}
+        .badge-macro { background: #ebecf0; color: #172b4d; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 800;}
+        
+        .node.epic { border-top-color: #2684ff; min-width: 320px; box-shadow: 0 8px 20px rgba(38,132,255,0.15);}
+        .node.epic .node-header { font-size: 18px; color: #0052cc; border-bottom: none; margin-bottom: 0;}
+        .node.epic .badge-macro { background: #deebff; color: #0052cc; font-size: 14px;}
+        .node.admin { border-top-color: #00875a; }
+        .node.admin .node-header { color: #00875a; font-size: 16px;}
+        .node.admin .badge-macro { background: #e3fcef; color: #006644;}
+        .node.app { border-top-color: #6554c0; }
+        .node.app .node-header { color: #6554c0; font-size: 16px;}
+        .node.app .badge-macro { background: #eae6ff; color: #403294;}
+        .node.phase-admin { border-top-color: #36b37e; }
+        .node.phase-app { border-top-color: #8777d9; }
+        .node.large { min-width: 580px; } 
+
+        .tags-container { display: flex; flex-direction: column; gap: 6px; }
+        .tags-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; } 
+        
+        /* Cards do Macro View */
+        .tag { border: 1px solid rgba(0,0,0,0.08); padding: 12px; border-radius: 8px; font-size: 11px; color: #172b4d; transition: all 0.2s; display: flex; flex-direction: column; background: #fff; text-align: left; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
+        .tag-top { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; gap: 8px; margin-bottom: 6px;}
+        .tag-info strong { font-size: 13px; margin-bottom: 2px; display: block;}
+        .tag-hours { font-weight: 800; background: rgba(9,30,66,0.06); padding: 4px 8px; border-radius: 6px; font-size: 12px;}
+        .deps-text-macro { font-size: 10px; font-family: monospace; background: #ebecf0; padding: 3px 6px; border-radius: 4px; color: #172b4d; font-weight: 700; display: inline-block; align-self: flex-start;}
+        
+        .tag:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(9,30,66,0.08);}
+        .admin-task-tag { border-left: 5px solid #36b37e;}
+        .admin-task-tag .tag-info strong { color: #006644; }
+        .app-task-tag { border-left: 5px solid #8777d9;}
+        .app-task-tag .tag-info strong { color: #403294; }
+
+        /* =========================================
+           VISÃO MICRO (SANFONAS E CARTÕES)
+           ========================================= */
+        #view-micro { max-width: 1400px; margin: 0 auto; padding: 20px 20px 60px 20px;}
+        
+        details { margin-bottom: 8px; border-radius: 8px; background: white; box-shadow: 0 1px 3px rgba(9,30,66,0.05); }
+        summary { padding: 14px 20px; cursor: pointer; list-style: none; font-weight: 600; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; user-select: none; transition: background 0.2s; }
+        summary::-webkit-details-marker { display: none; }
+        summary:hover { filter: brightness(0.95); }
+        
+        .level-admin-micro > summary { background: linear-gradient(135deg, #00875a 0%, #006644 100%); color: white; font-size: 16px; margin-top: 15px;}
+        .level-app-micro > summary { background: linear-gradient(135deg, #6554c0 0%, #403294 100%); color: white; font-size: 16px; margin-top: 15px;}
+        .level-fase-micro > summary { background-color: #ff991f; color: white; margin-left: 40px; font-size: 15px; margin-top: 10px;}
+        .level-tela-micro > summary { background-color: white; color: #172b4d; margin-left: 80px; border: 1px solid #dfe1e6; font-size: 14px;}
+        
+        .split-pills { display: flex; gap: 8px; align-items: center; }
+        .pill-dev { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;}
+        .pill-qa { background: rgba(255, 86, 48, 0.9); color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.2);}
+        .level-tela-micro .pill-dev { background: #deebff; border: none; color: #0052cc; }
+        
+        .badge-box { display: flex; align-items: center; gap: 10px; }
+        .badge-dark { font-size: 11px; background: #f4f5f7; border: 1px solid #dfe1e6; color: #5e6c84; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+        .badge-hours { font-size: 14px; font-weight: 700; background: white; color: #172b4d; padding: 4px 10px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+        
+        .level-admin-micro > summary .badge-hours { color: #00875a; }
+        .level-app-micro > summary .badge-hours { color: #6554c0; }
+        .level-fase-micro > summary .badge-hours { color: #ff991f; }
+        .level-tela-micro > summary .badge-hours { background: #ebecf0; box-shadow: none; color: #172b4d; font-size: 13px;}
+
+        .task-grid-micro { display: flex; flex-wrap: wrap; gap: 15px; margin-left: 100px; padding: 15px 0 20px 0; }
+        .task-card { background: white; border: 1px solid #dfe1e6; border-radius: 8px; padding: 16px; width: 250px; display: flex; flex-direction: column; transition: all 0.2s;}
+        .task-card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(9,30,66,0.1); }
+        
+        .admin-card { border-top: 4px solid #00875a; }
+        .app-card { border-top: 4px solid #6554c0; }
+        
+        /* Destaque QA */
+        .qa-card { border: 2px dashed #ff5630; border-top: 5px solid #ff5630; background: linear-gradient(180deg, #ffffff 0%, #fffafa 100%);}
+        .qa-card .task-title { color: #bf2600; }
+
+        .task-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: #172b4d; line-height: 1.4;}
+        .task-meta { font-size: 11px; color: #5e6c84; border-top: 1px dashed #dfe1e6; padding-top: 10px; margin-top: auto;}
+        
+        .est-row { display: flex; align-items: center; justify-content: space-between; background: #f4f5f7; padding: 6px 10px; border-radius: 6px;}
+        .qa-card .est-row { background: #ffebe6; } 
+        .meta-label { font-weight: 700; color: #5e6c84; text-transform: uppercase; font-size: 10px;}
+        .qa-card .meta-label { color: #de350b; }
+        
+        .dev-hours-value { font-weight: 800; color: #0052cc; font-size: 13px;}
+        .qa-hours-value { background: #ff5630; color: white; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-size: 13px;}
+        .deps-text-micro { font-family: monospace; background: #ebecf0; padding: 2px 6px; border-radius: 4px; color: #172b4d; font-size: 11px; font-weight: 600;}
+
+    </style>
+</head>
+<body>
+
+    <div class="header-wrapper">
+        <div class="dashboard">
+            <div class="dash-top">
+                <div class="dash-brand">
+                    <h1>CNPJ Alfa Numérico</h1>
+                    <p>Dashboard Executivo de Estimativas</p>
+                </div>
+                
+                <div class="view-toggle">
+                    <div class="toggle-bg" id="toggle-bg"></div>
+                    <button id="btn-macro" class="active" onclick="switchView('macro')">Visão Macro</button>
+                    <button id="btn-micro" onclick="switchView('micro')">Detalhamento</button>
+                </div>
+
+                <div id="controls-macro" class="action-buttons">
+                    <button class="btn-secondary" onclick="zoomControl(-0.15)">- Zoom</button>
+                    <button class="btn-action" onclick="autoFit()">Centralizar Árvore</button>
+                    <button class="btn-secondary" onclick="zoomControl(0.15)">+ Zoom</button>
+                </div>
+                <div id="controls-micro" class="action-buttons" style="display: none;">
+                    <button class="btn-action" onclick="toggleAccordions(true)">Expandir Tudo</button>
+                    <button class="btn-secondary" onclick="toggleAccordions(false)">Recolher Tarefas</button>
+                </div>
+            </div>
+
+            <div class="dash-bottom">
+                <div class="dash-stats" id="global-stats"></div>
+                
+                <div class="progress-wrapper">
+                    <div class="progress-labels">
+                        <span style="color: #0052cc;">Desenvolvimento (<span id="pct-dev"></span>%)</span>
+                        <span style="color: #ff5630;">Q.A. (<span id="pct-qa"></span>%)</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="bar-dev" class="prog-dev"></div>
+                        <div id="bar-qa" class="prog-qa"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="view-macro" class="view-container active">
+        <div id="diagram-canvas" class="tree">
+            <ul id="macro-tree-root"></ul>
+        </div>
+    </div>
+
+    <div id="view-micro" class="view-container">
+        <div id="micro-container"></div>
+    </div>
+
+<script>
+    // ==========================================
+    // 1. CARREGAMENTO DOS DADOS
+    // ==========================================
+    const EAP_DATA = { admin: { nome: "ADMIN (Plataforma)", fases: [] }, app: { nome: "APP (Cliente)", fases: [] } };
+
+    function initFases(target, nomes) { nomes.forEach(nome => target.fases.push({ nome: nome, telas: [] })); }
+
+    initFases(EAP_DATA.admin, ["1 BackEnd", "2 FrontEnd", "3 Banco de Dados", "4 Crons", "5 Webhooks", "6 Integrações"]);
+    initFases(EAP_DATA.app, ["1 BackEnd", "2 FrontEnd", "3 Webhooks", "4 Integrações"]);
+
+    // ADMIN BASE
+    EAP_DATA.admin.fases[0].telas.push(
+        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo DocumentService.php", h: 4 }] },
+        { nome: "1.2 Ajustar Libs de Validação", deps: "Nenhuma", tasks: [{ id: "1.2", desc: "Ajustar Libs de Validação do CNPJ", h: 4 }] }
+    );
+    
+    const telasAdminList = [
+        { id: "2.1", nome: "Mascara Global JS", qa: 0, desc: "Atualizar form_masks.js" },
+        { id: "2.2", nome: "Tela Empresas", qa: 3 }, { id: "2.3", nome: "Tela GestaoDeLeads", qa: 3 },
+        { id: "2.4", nome: "Tela Clientes", qa: 2 }, { id: "2.5", nome: "Tela Bancario", qa: 2 },
+        { id: "2.6", nome: "Tela Socios", qa: 2 }, { id: "2.7", nome: "Tela Funcionarios", qa: 2 },
+        { id: "2.8", nome: "Tela Dependentes", qa: 2 }, { id: "2.9", nome: "Tela FinanceiroReceber", qa: 2 },
+        { id: "2.10", nome: "Tela Pagamentos", qa: 2 }, { id: "2.11", nome: "Tela Notas_fiscais", qa: 2 },
+        { id: "2.12", nome: "Tela Colaboradores", qa: 2 }, { id: "2.13", nome: "Tela Hooks", qa: 2 },
+        { id: "2.14", nome: "Tela Indicadores", qa: 2 }, { id: "2.15", nome: "Tela TextExtract", qa: 2 },
+        { id: "2.16", nome: "Tela Tomadores", qa: 2 }, { id: "2.17", nome: "Tela Usuarios", qa: 2 },
+        { id: "2.18", nome: "Relatório Cobranças", qa: 2, noDeps: true }, { id: "2.19", nome: "Relatório Empresas Pró-Labores", qa: 2 },
+        { id: "2.20", nome: "Relatório Empresas Funcionários", qa: 2 }, { id: "2.21", nome: "Relatório NFs", qa: 2 },
+        { id: "2.22", nome: "Relatório Assinaturas", qa: 2 }, { id: "2.23", nome: "Relatório Empresas Operação", qa: 2 },
+        { id: "2.24", nome: "Relatório Pós-CNPJ", qa: 2 }, { id: "2.25", nome: "Relatório Responsabilidade Técnica", qa: 2 },
+        { id: "2.26", nome: "Relatório Migração", qa: 2 }, { id: "2.27", nome: "Relatório Fator R", qa: 2 },
+        { id: "2.28", nome: "Relatório Empresas", qa: 2 }, { id: "2.29", nome: "Relatório Esteira", qa: 2 },
+        { id: "2.30", nome: "Relatório Faturamento", qa: 2 }, { id: "2.31", nome: "Relatório Duplicados", qa: 2 },
+        { id: "2.32", nome: "Relatório DIRF", qa: 2 }, { id: "2.33", nome: "Relatório Letsbank", qa: 2 },
+        { id: "2.34", nome: "Relatório Churn Inativos", qa: 2 }, { id: "2.35", nome: "Relatório Solicitações", qa: 2 },
+        { id: "2.37", nome: "Relatório Descontos Utilizados", qa: 2 }, { id: "2.38", nome: "Relatório Base Inativa", qa: 2 },
+        { id: "2.39", nome: "Relatório Histórico de Ativações", qa: 2 }, { id: "2.40", nome: "Relatório Configuração de Rotinas", qa: 2 },
+        { id: "2.41", nome: "Relatório Empresas Carteiras", qa: 2 }
+    ];
+
+    telasAdminList.forEach(tela => {
+        let tarefas = tela.id === "2.1" ? [{ id: "2.1.2", desc: tela.desc, h: 2 }] : [
+            { id: `${tela.id}.1`, desc: "Direcionar para a máscara global", h: 2 },
+            { id: `${tela.id}.2`, desc: "Revisar a utilização dos campos em tela", h: 4 },
+            { id: `${tela.id}.3`, desc: "Garantir que não ocorreram downgrade", h: 1 },
+            { id: `${tela.id}.4`, desc: "Mostrar erro em tela quando erro do parceiro", h: 1 },
+            { id: `${tela.id}.5`, desc: "Implementar máscaras", h: 1 },
+            { id: `${tela.id}.6`, desc: "Automatizar de Testes", h: tela.qa }
+        ];
+        let deps = (tela.id === "2.1" || tela.noDeps) ? "Nenhuma" : "1.1, 1.2, 2.1";
+        EAP_DATA.admin.fases[1].telas.push({ nome: `${tela.id} ${tela.nome}`, deps: deps, tasks: tarefas });
+    });
+
+    // 🏆 AGORA O MACRO MOSTRA OS CARDS SEPARADOS!
+    EAP_DATA.admin.fases[2].telas.push(
+        { nome: "3.1 Analisar string máxima", deps: "Nenhuma", tasks: [ { id: "3.1", desc: "Analisar a string máxima em cada tabela", h: 2 }] },
+        { nome: "3.2 Alterar tamanho para 14", deps: "Nenhuma", tasks: [ { id: "3.2", desc: "Alterar para 14 o tamanho", h: 2 }] },
+        { nome: "3.3 Lidar c/ dados não-CNPJ", deps: "Nenhuma", tasks: [ { id: "3.3", desc: "Lidar com os dados que não sejam CNPJ", h: 4 }] }
+    );
+    
+    EAP_DATA.admin.fases[3].telas.push(
+        { nome: "4.1 Analisar Crons", deps: "Nenhuma", tasks: [{ id: "4.1.1", desc: "Analisar se existe campo CNPJ no arquivo Agendamentos", h: 2 }] }, 
+        { nome: "4.2 Alterar Crons", deps: "1.1, 1.2, 2.1, 4.2", tasks: [{ id: "4.2.1", desc: "Alterar Crons necessárias", h: 2 }, { id: "4.2.2", desc: "Testar as requests isoladamente", h: 8 }] }
+    );
+
+    EAP_DATA.admin.fases[4].telas.push(
+        { nome: "5.1 Analisar WebHooks", deps: "Nenhuma", tasks: [{ id: "5.1.1", desc: "Analizar Hooks_rdstation.php", h: 2 }, { id: "5.1.2", desc: "Analizar Hooks.php (Asaas)", h: 2 }, { id: "5.1.3", desc: "Analizar Hooks_enotas.php", h: 2 }, { id: "5.1.4", desc: "Analizar Hooks_octadesk", h: 2 }] }, 
+        { nome: "5.2 Alterar WebHooks", deps: "1.1, 1.2, 2.1, 5.1", tasks: [{ id: "5.2.1", desc: "Ajustar hooks que utilizam cpf/cnpj", h: 2 }, { id: "5.2.2", desc: "Testar as requests", h: 8 }] }
+    );
+
+    EAP_DATA.admin.fases[5].telas.push(
+        { nome: "6.1 Mapear integrações", deps: "1.1, 1.2, 2.1", tasks: [{ id: "6.1", desc: "Mapear as integrações ativas", h: 2 }] },
+        { nome: "6.2 Comunicar parceiros", deps: "1.1, 1.2, 2.1", tasks: [{ id: "6.2", desc: "Comunicar os parceiros das integrações", h: 8 }] },
+        { nome: "6.3 Melhorar requests", deps: "1.1, 1.2, 2.1", tasks: [{ id: "6.3", desc: "Melhorar o tratamento das requests", h: 2 }] },
+        { nome: "6.4 Comunicar erro Alfa", deps: "1.1, 1.2, 2.1", tasks: [{ id: "6.4", desc: "Comunicar erro especifico CNPJ Alfa", h: 2 }] }
+    );
+
+    // APP BASE
+    EAP_DATA.app.fases[0].telas.push(
+        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo application/libraries/DocumentService.php", h: 4 }] },
+        { nome: "1.2 Ajustar Libs de Validação", deps: "Nenhuma", tasks: [{ id: "1.2", desc: "Ajustar Libs de Validação do CNPJ", h: 4 }] }
+    );
+    ["1.3 Finder Leads", "1.4 Finder Empresas", "1.5 Finder Dependentes", "1.6 Finder Pagamentos"].forEach(f => {
+        EAP_DATA.app.fases[0].telas.push({ nome: f, deps: "1.1, 1.2, 2.1", tasks: [{ id: `${f.split(' ')[0]}.1`, desc: "Direcionar para a máscara global", h: 4 }, { id: `${f.split(' ')[0]}.2`, desc: "Implementar máscaras", h: 4 }]});
+    });
+
+    const telasAppList = [
+        { id: "2.1", nome: "Mascara Global JS", qa: 0, desc: "form_masks.js" },
+        { id: "2.2", nome: "APIs TypeScript", qa: 0 },
+        { id: "2.3", nome: "Tela Abertura Empresa" }, { id: "2.4", nome: "Tela Funcionarios" },
+        { id: "2.5", nome: "Tela Socios" }, { id: "2.6", nome: "Tela Dependentes" },
+        { id: "2.7", nome: "Tela Tomadores" }, { id: "2.8", nome: "Tela Pedidos" },
+        { id: "2.9", nome: "Tela Assinaturas" }, { id: "2.10", nome: "Tela Pagamentos" },
+        { id: "2.11", nome: "Tela Usuarios" }, { id: "2.12", nome: "Tela Confirmar Dados" },
+        { id: "2.13", nome: "Tela Cobrancas" }, { id: "2.14", nome: "Tela Meus Dados" }
+    ];
+
+    telasAppList.forEach(tela => {
+        let tarefas;
+        if(tela.id === "2.1") {
+            tarefas = [{ id: "2.1.2", desc: tela.desc, h: 2 }];
+        } else if(tela.id === "2.2") {
+            tarefas = [
+                { id: "2.2.1", desc: "Atualizar Processo Textract Controller.ts", h: 2 }, { id: "2.2.3", desc: "Atualizar Analyze Files", h: 2 },
+                { id: "2.2.4", desc: "Atualizar Leads.d", h: 2 }, { id: "2.2.5", desc: "Atualizar Funcionarios", h: 2 }, { id: "2.2.6", desc: "Atualizar Empresas", h: 2 }
+            ];
+        } else {
+            tarefas = [
+                { id: `${tela.id}.1`, desc: "Direcionar para a máscara global", h: 2 },
+                { id: `${tela.id}.2`, desc: "Revisar a utilização dos campos em tela", h: 4 },
+                { id: `${tela.id}.3`, desc: "Garantir que não ocorreram downgrade", h: 1 },
+                { id: `${tela.id}.4`, desc: "Mostrar erro em tela quando erro do parceiro", h: 1 },
+                { id: `${tela.id}.5`, desc: "Implementar máscaras", h: 1 },
+                { id: `${tela.id}.6`, desc: "Automatizar Testes", h: 2 }
+            ];
+        }
+        let deps = (tela.id === "2.1" || tela.id === "2.2") ? "Nenhuma" : "1.1, 1.2, 2.1";
+        EAP_DATA.app.fases[1].telas.push({ nome: `${tela.id} ${tela.nome}`, deps: deps, tasks: tarefas });
+    });
+
+    // 🏆 AGORA O MACRO MOSTRA OS CARDS SEPARADOS NO APP TAMBÉM!
+    EAP_DATA.app.fases[2].telas.push(
+        { nome: "3.1 Analisar Letsbank", deps: "1.1, 1.2, 2.1", tasks: [{ id: "3.1.1", desc: "Letsbank.php", h: 2 }] },
+        { nome: "3.2 Alterar WebHooks", deps: "1.1, 1.2, 2.1", tasks: [{ id: "3.2", desc: "Alterar WebHooks", h: 8 }] },
+        { nome: "3.3 Testar as requests", deps: "1.1, 1.2, 2.1", tasks: [{ id: "3.3", desc: "Testar as requests", h: 8 }] }
+    );
+    
+    EAP_DATA.app.fases[3].telas.push(
+        { nome: "4.1 Mapear integrações ativas", deps: "Nenhuma", tasks: [{ id: "4.1", desc: "Mapear as integrações ativas", h: 2 }] },
+        { nome: "4.2 Comunicar os parceiros", deps: "Nenhuma", tasks: [{ id: "4.2", desc: "Comunicar os parceiros das integrações", h: 8 }] },
+        { nome: "4.3 Melhorar tratamento requests", deps: "Nenhuma", tasks: [{ id: "4.3", desc: "Melhorar o tratamento das requests", h: 2 }] },
+        { nome: "4.4 Comunicar erro Alfa", deps: "Nenhuma", tasks: [{ id: "4.4", desc: "Comunicar erro especifico CNPJ Alfa", h: 2 }] }
+    );
+
+    // ==========================================
+    // 2. A REGRA DE OURO - CÁLCULO DEV x QA
+    // ==========================================
+    let globalTotal = 0, globalDev = 0, globalQA = 0;
+
+    function calculateStats(node) {
+        node.totalH = 0; node.devH = 0; node.qaH = 0;
+        node.fases.forEach(fase => {
+            fase.totalH = 0; fase.devH = 0; fase.qaH = 0;
+            fase.telas.forEach(tela => {
+                tela.totalH = 0; tela.devH = 0; tela.qaH = 0;
+                tela.tasks.forEach(t => {
+                    tela.totalH += t.h;
+                    
+                    // MÁGICA DE QA: Apenas contendo a palavra "Automatizar"
+                    if(t.desc.includes("Automatizar")) {
+                        t.isQA = true;
+                        tela.qaH += t.h;
+                    } else {
+                        t.isQA = false;
+                        tela.devH += t.h;
+                    }
+                });
+                fase.totalH += tela.totalH; fase.devH += tela.devH; fase.qaH += tela.qaH;
+            });
+            node.totalH += fase.totalH; node.devH += fase.devH; node.qaH += fase.qaH;
+        });
+        globalTotal += node.totalH; globalDev += node.devH; globalQA += node.qaH;
+    }
+
+    calculateStats(EAP_DATA.admin); calculateStats(EAP_DATA.app);
+
+    document.getElementById('global-stats').innerHTML = `
+        <div class="stat-item"><span class="stat-label">Total do Projeto</span><span class="stat-value">${globalTotal}h</span></div>
+        <div class="stat-item"><span class="stat-label">Admin (Total)</span><span class="stat-value val-admin">${EAP_DATA.admin.totalH}h</span></div>
+        <div class="stat-item"><span class="stat-label">App (Total)</span><span class="stat-value val-app">${EAP_DATA.app.totalH}h</span></div>
+        <div class="stat-item"><span class="stat-label val-dev">Desenvolvimento</span><span class="stat-value val-dev">${globalDev}h</span></div>
+        <div class="stat-item" style="border-left: 2px solid #ffebe6;"><span class="stat-label val-qa">Testes (Q.A.)</span><span class="stat-value val-qa">${globalQA}h</span></div>
+    `;
+    
+    let devPct = ((globalDev / globalTotal) * 100).toFixed(1);
+    let qaPct = ((globalQA / globalTotal) * 100).toFixed(1);
+    document.getElementById('bar-dev').style.width = devPct + '%';
+    document.getElementById('bar-qa').style.width = qaPct + '%';
+    document.getElementById('pct-dev').innerText = devPct;
+    document.getElementById('pct-qa').innerText = qaPct;
+
+
+    // ==========================================
+    // 3. RENDERIZAÇÃO DO DIAGRAMA MACRO (AGORA LISTA CARDS SEPARADOS)
+    // ==========================================
+    let macroHtml = `
+    <li>
+        <div class="node epic"><div class="node-header"><span>Épico: CNPJ Alfa Numérico</span><span class="badge-macro">${globalTotal}h</span></div></div>
+        <ul>`;
+
+    ['admin', 'app'].forEach(tipo => {
+        let node = EAP_DATA[tipo];
+        macroHtml += `<li><div class="node ${tipo}"><div class="node-header"><span>${node.nome}</span><span class="badge-macro">${node.totalH}h</span></div></div><ul>`;
+        
+        node.fases.forEach(fase => {
+            let isLarge = fase.nome.includes('FrontEnd') ? 'large' : '';
+            macroHtml += `<li><div class="node phase-${tipo} ${isLarge}"><div class="node-header"><span>${fase.nome}</span><span class="badge-macro">${fase.totalH}h</span></div>`;
+            
+            let gridClass = isLarge ? 'tags-grid' : 'tags-container';
+            macroHtml += `<div class="${gridClass}">`;
+            fase.telas.forEach(tela => {
+                
+                // Dependências explicitas nos cartões Macro
+                let depsDisplay = tela.deps !== "Nenhuma" ? `<div class="deps-text-macro">Deps: ${tela.deps}</div>` : '';
+                
+                macroHtml += `
+                <div class="tag ${tipo}-task-tag">
+                    <div class="tag-top">
+                        <div class="tag-info"><strong>${tela.nome.split(' ')[0]}</strong> ${tela.nome.substring(tela.nome.indexOf(' ')+1)}</div>
+                        <div class="tag-hours">${tela.totalH}h</div>
+                    </div>
+                    ${depsDisplay}
+                </div>`;
+            });
+            macroHtml += `</div></div></li>`;
+        });
+        macroHtml += `</ul></li>`;
+    });
+    macroHtml += `</ul></li>`;
+    document.getElementById('macro-tree-root').innerHTML = macroHtml;
+
+
+    // ==========================================
+    // 4. RENDERIZAÇÃO DA LISTA MICRO
+    // ==========================================
+    function renderMicro(ramoInfo, typeClass) {
+        let html = `<details class="level-${typeClass}-micro" open><summary class="micro-summary">
+            <span>${ramoInfo.nome}</span>
+            <div class="split-pills">
+                <span class="pill-dev">Dev: ${ramoInfo.devH}h</span><span class="pill-qa">QA: ${ramoInfo.qaH}h</span><span class="badge-hours">${ramoInfo.totalH}h</span>
+            </div>
+        </summary>`;
+        
+        ramoInfo.fases.forEach(fase => {
+            html += `<details class="level-fase-micro" open><summary class="micro-summary">
+                <span>${fase.nome}</span>
+                <div class="split-pills">
+                    <span class="pill-dev" style="border-color: rgba(255,255,255,0.5);">Dev: ${fase.devH}h</span>
+                    ${fase.qaH > 0 ? `<span class="pill-qa">QA: ${fase.qaH}h</span>` : ''}
+                    <span class="badge-hours">${fase.totalH}h</span>
+                </div>
+            </summary>`;
+            
+            fase.telas.forEach(tela => {
+                let cardsHtml = '';
+                tela.tasks.forEach(task => {
+                    let cardClass = task.isQA ? 'qa-card' : `${typeClass}-card`;
+                    let estLabel = task.isQA ? `Estimativa (QA):` : `Estimativa Dev:`;
+                    let valueClass = task.isQA ? `qa-hours-value` : `dev-hours-value`;
+                    let depDisplay = tela.deps !== "Nenhuma" ? `<span class="deps-text-micro">${tela.deps}</span>` : 'N/A';
+
+                    cardsHtml += `
+                    <div class="task-card ${cardClass}">
+                        <div class="task-title">${task.id} - ${task.desc}</div>
+                        <div class="task-meta">
+                            <div class="meta-group">
+                                <div class="est-row"><span class="meta-label">${estLabel}</span><span class="${valueClass}">${task.h}h</span></div>
+                                <div style="margin-top: 6px; display:flex; justify-content: space-between; align-items:center;"><span class="meta-label">Dependências:</span>${depDisplay}</div>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += `<details class="level-tela-micro"><summary class="micro-summary">
+                    <div class="badge-box"><span>${tela.nome}</span><span class="badge badge-dark">Deps: ${tela.deps}</span></div>
+                    <div class="split-pills">
+                        <span class="pill-dev">Dev: ${tela.devH}h</span>
+                        ${tela.qaH > 0 ? `<span class="pill-qa">QA: ${tela.qaH}h</span>` : ''}
+                        <span class="badge-hours" style="background: #dfe1e6;">Total: ${tela.totalH}h</span>
+                    </div>
+                </summary><div class="task-grid-micro">${cardsHtml}</div></details>`;
+            });
+            html += `</details>`;
+        });
+        html += `</details>`;
+        return html;
+    }
+
+    document.getElementById('micro-container').innerHTML = renderMicro(EAP_DATA.admin, 'admin') + renderMicro(EAP_DATA.app, 'app');
+
+
+    // ==========================================
+    // 5. LÓGICA DA INTERFACE E BOTÕES
+    // ==========================================
+    function switchView(view) {
+        const bg = document.getElementById('toggle-bg');
+        if(view === 'macro') {
+            bg.style.transform = 'translateX(0)';
+            document.getElementById('btn-macro').classList.add('active'); document.getElementById('btn-micro').classList.remove('active');
+            document.getElementById('view-macro').classList.add('active'); document.getElementById('view-micro').classList.remove('active');
+            document.getElementById('controls-macro').style.display = 'flex'; document.getElementById('controls-micro').style.display = 'none';
+            document.body.style.overflow = 'hidden'; 
+            setTimeout(autoFit, 100);
+        } else {
+            bg.style.transform = 'translateX(140px)';
+            document.getElementById('btn-micro').classList.add('active'); document.getElementById('btn-macro').classList.remove('active');
+            document.getElementById('view-micro').classList.add('active'); document.getElementById('view-macro').classList.remove('active');
+            document.getElementById('controls-micro').style.display = 'flex'; document.getElementById('controls-macro').style.display = 'none';
+            document.body.style.overflow = 'auto'; 
+        }
+    }
+
+    // BOTÃO RECOLHER MELHORADO: Fecha apenas as "Telas", mantendo as Fases principais visíveis!
+    function toggleAccordions(estado) {
+        if(estado) {
+            document.querySelectorAll('#view-micro details').forEach(det => det.setAttribute('open', ''));
+        } else {
+            document.querySelectorAll('.level-tela-micro').forEach(det => det.removeAttribute('open'));
+            document.querySelectorAll('.level-admin-micro, .level-app-micro, .level-fase-micro').forEach(det => det.setAttribute('open', ''));
+        }
+    }
+
+    const viewport = document.getElementById('view-macro');
+    const canvas = document.getElementById('diagram-canvas');
+    let scale = 1, panning = false, pointX = 0, pointY = 0, start = { x: 0, y: 0 };
+
+    function setTransform() { canvas.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; }
+
+    viewport.onmousedown = function (e) {
+        if (e.target.closest('.header-wrapper')) return;
+        e.preventDefault(); start = { x: e.clientX - pointX, y: e.clientY - pointY }; panning = true; viewport.classList.add('grabbing');
+    }
+    window.onmouseup = function () { panning = false; viewport.classList.remove('grabbing'); }
+    window.onmousemove = function (e) {
+        if (!panning) return; pointX = (e.clientX - start.x); pointY = (e.clientY - start.y); setTransform();
+    }
+    function zoomControl(delta) { scale += delta; if (scale < 0.1) scale = 0.1; if (scale > 3) scale = 3; setTransform(); }
+    viewport.onwheel = function (e) {
+        e.preventDefault(); var xs = (e.clientX - pointX) / scale, ys = (e.clientY - pointY) / scale;
+        var factor = Math.exp(-e.deltaY * 0.001); scale *= factor;
+        if (scale < 0.1) scale = 0.1; if (scale > 3) scale = 3;
+        pointX = e.clientX - xs * scale; pointY = e.clientY - ys * scale; setTransform();
+    }
+    function autoFit() {
+        canvas.style.transform = 'translate(0px, 0px) scale(1)';
+        const screenWidth = window.innerWidth, screenHeight = window.innerHeight;
+        const diagWidth = canvas.scrollWidth, diagHeight = canvas.scrollHeight;
+        const scaleX = (screenWidth - 80) / diagWidth, scaleY = (screenHeight - 170) / diagHeight;
+        scale = Math.min(scaleX, scaleY, 1); if (scale < 0.1) scale = 0.1;
+        pointX = (screenWidth / 2) - (diagWidth * scale / 2); pointY = 20;
+        setTransform();
+    }
+
+    window.onload = () => { switchView('macro'); };
+    window.onresize = () => { if(document.getElementById('view-macro').classList.contains('active')) autoFit(); };
+
+</script>
+
+</body>
+</html>
