@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Página de Blog - Acessibilidade com Narração (Exemplo Funcional)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose { /* Estilos básicos para o conteúdo do artigo, simulando um blog */
+            max-width: 65ch; 
+            line-height: 1.7;
+        }
+        .prose h1, .prose h2, .prose h3 { font-weight: 700; color: #292524; margin-top: 1.5em; margin-bottom: 0.5em; }
+        .prose p { margin-bottom: 1em; }
+        .prose ul { list-style-type: disc; margin-left: 1.5em; margin-bottom: 1em; }
+
+        /* A estilização @keyframes para a animação é adicionada via JavaScript */
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-800 antialiased p-4">
+
+    <div class="container mx-auto max-w-3xl bg-white p-6 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold mb-4 text-stone-900">A Importância da Voz Neural na Acessibilidade Web</h1>
+        <p class="text-stone-600 mb-6">Descubra como a narração automática pode transformar a experiência do utilizador.</p>
+
+        <div id="meliva-audio-player-widget" style="margin-bottom: 24px; padding: 16px; background-color: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 6px; display: flex; justify-content: center; align-items: center; min-height: 80px;">
+            <p style="font-family: 'Inter', sans-serif; color: #78716c; text-align: center;">A carregar narração do artigo...</p>
+        </div>
+        
+        <div style="font-size: 12px; margin-top: 5px; color: #0D2639; text-align: left; padding-left: 10px;">
+            Reproduções: <span class="play-count-display">0</span>
+        </div>
+
+        <div id="blog-article-content" class="prose max-w-none text-stone-700 leading-relaxed">
+            <p>No mundo digital de hoje, a acessibilidade não é apenas uma opção, mas uma necessidade. Garantir que o conteúdo online seja acessível a todos, independentemente das suas capacidades, é fundamental para a inclusão. Uma das inovações mais promissoras neste campo é a utilização de **vozes neurais** para a narração de conteúdo web.</p>
+            <p>Imagine poder ouvir os seus artigos de blog favoritos enquanto faz outras tarefas, ou ter acesso ao conteúdo mesmo com dificuldades visuais. É exatamente isso que a tecnologia Text-to-Speech (TTS) com voz neural permite, transformando a forma como interagimos com a informação.</p>
+            <h2 class="text-2xl font-semibold mt-6 mb-3 text-stone-900">A Evolução da Voz Sintética</h2>
+            <p>Historicamente, as vozes sintetizadas eram robóticas e artificiais, tornando a experiência de audição cansativa. No entanto, com os avanços em inteligência artificial e aprendizagem de máquina, as vozes neurais alcançaram um nível de naturalidade impressionante. Empresas como a ElevenLabs estão na vanguarda, oferecendo vozes que capturam nuances, entonação e emoção, criando uma experiência auditiva agradável e imersiva.</p>
+            <h3 class="text-xl font-semibold mt-4 mb-2 text-stone-900">Como Funciona a Integração</h3>
+            <p>A ideia é simples: o texto de um artigo é processado por um modelo de IA que o converte em áudio com uma voz humana realista. Este áudio pode então ser reproduzido diretamente na página. Para os programadores, isto significa integrar uma API que recebe o texto e retorna um ficheiro de áudio ou um stream.</p>
+            <p>A flexibilidade de um leitor de áudio HTML5 nativo (`&lt;audio&gt;`) oferece controlo total sobre a interface e o comportamento da reprodução, sem a necessidade de depender de widgets de terceiros para a renderização do leitor. Isto permite uma integração perfeita com o design existente do seu blog.</p>
+            <p>Este parágrafo adicional serve para demonstrar que o script consegue extrair um volume maior de texto para a narração.</p>
+        </div>
+
+        <script>
+(function() {
+    // --- CONFIGURAÇÃO DE ENDPOINTS ---
+    // Endpoint para geração de áudio (POST)
+    const YOUR_BACKEND_API_ENDPOINT = 'https://api.meliva.ai/audio/generate'; 
+    
+    // ENDPOINTS DE CONTAGEM BASEADOS NO SEU FLUXO DE BD
+    const GET_COUNT_API_ENDPOINT = window.location.protocol + '//' + window.location.hostname + '/audio/getcount'; // Leitura (GET)
+    const INCREMENT_API_ENDPOINT = window.location.protocol + '//' + window.location.hostname + '/audio/count'; // Criação/Incremento (POST)
+    
+    const ARTICLE_CONTENT_SELECTOR = '#blog-article-content'; 
+    const PLAYER_CONTAINER_ID = 'meliva-audio-player-widget';
+    
+    // Captura a URL da página atual para salvar no BD como métrica
+    const CURRENT_PAGE_URL = window.location.href; 
+
+    const playerContainer = document.getElementById(PLAYER_CONTAINER_ID);
+    const articleContentElement = document.querySelector(ARTICLE_CONTENT_SELECTOR);
+    const playCountDisplay = document.querySelector('.play-count-display'); 
+
+    // Adiciona estilo para a animação de carregamento
+    const style = document.createElement('style');
+    style.innerHTML = `@keyframes meliva-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`;
+    document.head.appendChild(style);
+
+    if (!playerContainer || !articleContentElement) return;
+
+    // --- FUNÇÃO PARA BUSCAR A CONTAGEM PERSISTIDA (Leitura no GET) ---
+    async function fetchInitialPlayCount(audioUrl, displayElement) {
+        try {
+            // Requisição GET para getcountAction (Apenas leitura)
+            const response = await fetch(GET_COUNT_API_ENDPOINT + '?audioUrl=' + encodeURIComponent(audioUrl), {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (!response.ok) {
+                 // Se o endpoint GET falhar (ex: 404 ou 403), loga e retorna 0.
+                 console.error("GET Count falhou com status:", response.status);
+                 return 0; 
+            }
+            
+            const data = await response.json();
+            
+            // O backend deve retornar 'currentCount'
+            if (data && data.success && data.currentCount !== undefined) { 
+                // ATUALIZA O DISPLAY COM O VALOR PERSISTIDO ANTES DE MOSTRAR O PLAYER
+                displayElement.textContent = data.currentCount.toString();
+                return data.currentCount;
+            } 
+        } catch (error) {
+            console.error("Falha ao buscar contagem inicial:", error);
+        }
+        return 0;
+    }
+
+
+    // --- FUNÇÃO PARA INCREMENTAR E ATUALIZAR (Escrita no POST) ---
+    function incrementPlayCount(audioUrl, displayElement, audioPlayerElement) {
+        // Verifica se já contamos nesta sessão de página
+        if (audioPlayerElement.getAttribute('data-has-counted') === 'true') {
+             return;
+        }
+
+        // Marca como contato ANTES de enviar a requisição
+        audioPlayerElement.setAttribute('data-has-counted', 'true');
+        
+        fetch(INCREMENT_API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                audioUrl: audioUrl, 
+                pageUrl: CURRENT_PAGE_URL // ENVIA A URL DA PÁGINA PARA INSERT/UPDATE NO BD
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Em caso de falha, reverte o flag para permitir nova tentativa
+                audioPlayerElement.setAttribute('data-has-counted', 'false'); 
+                return response.json().catch(() => ({ message: 'Erro de rede ou permissão (403).' }));
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.success && data.newCount !== undefined) {
+                // SUCESSO: Atualiza o display com a nova contagem do servidor
+                displayElement.textContent = data.newCount.toString();
+            } else if (data && data.message) {
+                console.error("Erro da API de contagem:", data.message);
+                audioPlayerElement.setAttribute('data-has-counted', 'false');
+            }
+        })
+        .catch(error => {
+            console.error("Falha na requisição de contagem:", error);
+            audioPlayerElement.setAttribute('data-has-counted', 'false');
+        });
+    }
+
+    function extractArticleText() {
+        let text = articleContentElement.innerText;
+        const MAX_CHARS_FOR_API = 5000; 
+        if (text.length > MAX_CHARS_FOR_API) {
+            text = text.substring(0, MAX_CHARS_FOR_API) + "... (Conteúdo truncado para narração)";
+        }
+        return text;
+    }
+
+    async function generateAndPlayAudio() {
+        const textToNarrate = extractArticleText();
+
+        if (!textToNarrate.trim()) {
+            playerContainer.innerHTML = '<p style="font-family: \'Inter\', sans-serif; color: #78716c; text-align: center;">Nenhum texto válido encontrado para gerar narração.</p>';
+            return;
+        }
+
+        playerContainer.innerHTML = '<p style="font-family: \'Inter\', sans-serif; color: #f97316; text-align: center; font-weight: 600; animation: meliva-pulse 1.5s infinite;">A gerar narração com voz neural... (Pode demorar alguns segundos)</p>';
+        
+        try {
+            // 1. CHAMA A API DE GERAÇÃO
+            const response = await fetch(YOUR_BACKEND_API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: textToNarrate })
+            });
+
+            if (!response.ok) {
+                const errorResponse = await response.json().catch(() => ({ message: 'Erro desconhecido do servidor.' }));
+                throw new Error(`Erro da API Meliva.ai: ${response.status} - ${errorResponse.message || response.statusText}`);
+            }
+
+            const data = await response.json();
+            const audioUrl = data.audioUrl; 
+
+            if (audioUrl) { 
+                // 2. BUSCA O VALOR PERSISTIDO (Sincronização crucial)
+                await fetchInitialPlayCount(audioUrl, playCountDisplay); 
+                
+                const audioPlayer = document.createElement('audio');
+                audioPlayer.controls = true;
+                audioPlayer.controlsList = 'nodownload'; 
+                audioPlayer.preload = 'auto';
+                audioPlayer.style.width = '100%';
+                audioPlayer.style.fontFamily = "'Inter', sans-serif";
+
+                const sourceElement = document.createElement('source');
+                sourceElement.src = audioUrl; 
+                sourceElement.type = 'audio/mpeg'; 
+                audioPlayer.appendChild(sourceElement);
+
+                // 3. ANEXAR O LISTENER DE CONTAGEM
+                audioPlayer.addEventListener('play', function() {
+                    const currentAudioSrc = this.currentSrc; 
+                    if (currentAudioSrc && playCountDisplay) {
+                        incrementPlayCount(currentAudioSrc, playCountDisplay, this);
+                    }
+                });
+
+                playerContainer.innerHTML = '';
+                playerContainer.appendChild(audioPlayer); 
+
+            } else {
+                throw new Error('URL de áudio não recebido da sua API.');
+            }
+
+            } catch (error) {
+                console.error('Meliva.ai Embed: Erro no processo de narração:', error);
+                playerContainer.innerHTML = `<p style="font-family: \'Inter\', sans-serif; color: #dc2626; text-align: center; font-weight: 600;">Falha na narração: ${error.message}.</p>`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', generateAndPlayAudio);
+    })();
+</script>
+    </div>
+</body>
+</html>
