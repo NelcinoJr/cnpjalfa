@@ -105,7 +105,7 @@
         .app-task-tag { border-left: 5px solid #8777d9;} .app-task-tag .tag-info strong { color: #403294; }
 
         /* =========================================
-           VISÃO MICRO
+           VISÃO MICRO E CARTÕES
            ========================================= */
         #view-micro { max-width: 1400px; margin: 0 auto; padding: 20px 20px 60px 20px;}
         
@@ -229,7 +229,7 @@
 
 <script>
     // ==========================================
-    // 1. CARREGAMENTO DOS DADOS E DEPENDÊNCIAS
+    // 1. CARREGAMENTO DOS DADOS BASE
     // ==========================================
     const EAP_DATA = { admin: { nome: "ADMIN (Plataforma)", fases: [] }, app: { nome: "APP (Cliente)", fases: [] } };
     function initFases(target, nomes) { nomes.forEach(nome => target.fases.push({ nome: nome, telas: [] })); }
@@ -239,7 +239,7 @@
 
     // ADMIN BASE
     EAP_DATA.admin.fases[0].telas.push(
-        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo DocumentService.php", h: 4, deps: "Nenhuma" }] },
+        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo DocumentService.php", h: 8, deps: "Nenhuma" }] },
         { nome: "1.2 Ajustar Libs de Validação", deps: "Nenhuma", tasks: [{ id: "1.2.1", desc: "Refatorar as Libs de Validação do CNPJ", h: 4, deps: "Nenhuma" }] }
     );
     
@@ -269,8 +269,7 @@
 
     telasAdminList.forEach(tela => {
         let pairH = tela.type === 1 ? 4 : 2;
-        // 🏆 REGRA APLICADA: Testes (.2, .3, .4) dependem obrigatoriamente do Backend E da construção da tela (.1)
-        let depsTestes = `1.1.2, 1.2.1, ${tela.id}.1`;
+        let depsTestes = `1.1.2, 1.2.1, ${tela.id}.1`; // A REGRA DE DEPENDÊNCIA DE TESTE APLICADA
         
         let tarefas = tela.id === "2.1" ? [{ id: "2.1.2", desc: tela.desc, h: 2, deps: "Nenhuma" }] : [
             { id: `${tela.id}.1`, desc: "Desenvolver e aplicar máscaras e validação", h: 3, deps: "1.1.2, 1.2.1" },
@@ -282,33 +281,33 @@
         EAP_DATA.admin.fases[1].telas.push({ nome: `${tela.id} ${tela.nome}`, deps: deps, tasks: tarefas });
     });
 
+    // 🎯 FASES 3 E 4 COM NOMES DIRETOS NO MACRO
     EAP_DATA.admin.fases[2].telas.push(
-        { nome: "3.1 Mapeamento BD", deps: "Nenhuma", tasks: [ { id: "3.1", desc: "Mapear tipagem e comprimento máximo das colunas", h: 2, deps: "Nenhuma" }] },
-        { nome: "3.2 Schema Migration", deps: "Nenhuma", tasks: [ { id: "3.2", desc: "Executar migração de esquema adequando para 14 caracteres", h: 2, deps: "3.1" }] },
-        { nome: "3.3 Data Cleansing", deps: "Nenhuma", tasks: [ { id: "3.3", desc: "Lidar com os dados que não sejam CNPJ", h: 4, deps: "3.2" }] }
+        { nome: "3.1 Mapear tipagem e comprimento máximo das colunas no banco de dados CNPJ", deps: "Nenhuma", tasks: [ { id: "3.1", desc: "Mapear tipagem e comprimento máximo das colunas", h: 2, deps: "Nenhuma" }] },
+        { nome: "3.2 Executar migração de esquema adequando para 14 caracteres CNPJ", deps: "3.1", tasks: [ { id: "3.2", desc: "Executar migração de esquema adequando para 14 caracteres", h: 2, deps: "3.1" }] },
+        { nome: "3.3 Lidar com os dados que não sejam CNPJ", deps: "3.2", tasks: [ { id: "3.3", desc: "Lidar com os dados que não sejam CNPJ", h: 4, deps: "3.2" }] }
     );
     
     EAP_DATA.admin.fases[3].telas.push(
-        { nome: "4.1 Mapeamento Crons", deps: "Nenhuma", tasks: [{ id: "4.1.1", desc: "Auditoria de dependências do campo CNPJ nos Agendamentos", h: 2, deps: "Nenhuma" }] }, 
-        { nome: "4.2 Refatoração Crons", deps: "1.1, 4.1", tasks: [{ id: "4.2.1", desc: "Alterar Crons necessárias para adequação de tipagem", h: 2, deps: "4.1.1" }, { id: "4.2.2", desc: "Executar testes unitários e validação de requisições", h: 8, deps: "4.2.1" }] }
+        { nome: "4.1 Mapeamento de Rotinas Agendadas", deps: "Nenhuma", tasks: [{ id: "4.1.1", desc: "Auditoria de dependências do campo CNPJ nos Agendamentos", h: 2, deps: "Nenhuma" }] }, 
+        { nome: "4.2 Refatoração de Rotinas Agendadas", deps: "1.1, 4.1", tasks: [{ id: "4.2.1", desc: "Alterar Crons necessárias para adequação de tipagem", h: 2, deps: "4.1.1" }, { id: "4.2.2", desc: "Executar testes unitários e validação de requisições", h: 8, deps: "4.2.1" }] }
     );
 
     EAP_DATA.admin.fases[4].telas.push(
-        { nome: "5.1 Auditoria WebHooks", deps: "Nenhuma", tasks: [{ id: "5.1.1", desc: "Auditoria de payload Hooks_rdstation", h: 2, deps: "Nenhuma" }, { id: "5.1.2", desc: "Auditoria de payload Hooks (Asaas)", h: 2, deps: "Nenhuma" }, { id: "5.1.3", desc: "Auditoria de payload Hooks_enotas", h: 2, deps: "Nenhuma" }, { id: "5.1.4", desc: "Auditoria de payload Hooks_octadesk", h: 2, deps: "Nenhuma" }] }, 
-        { nome: "5.2 Refatoração WebHooks", deps: "1.1", tasks: [{ id: "5.2.1", desc: "Alterar hooks para tratamento adequado de CNPJ", h: 2, deps: "1.1.2" }, { id: "5.2.2", desc: "Executar testes de integração das requisições", h: 8, deps: "5.2.1" }] }
+        { nome: "5.1 Auditoria de Integrações (WebHooks)", deps: "Nenhuma", tasks: [{ id: "5.1.1", desc: "Auditoria de payload Hooks_rdstation", h: 2, deps: "Nenhuma" }, { id: "5.1.2", desc: "Auditoria de payload Hooks (Asaas)", h: 2, deps: "Nenhuma" }, { id: "5.1.3", desc: "Auditoria de payload Hooks_enotas", h: 2, deps: "Nenhuma" }, { id: "5.1.4", desc: "Auditoria de payload Hooks_octadesk", h: 2, deps: "Nenhuma" }] }, 
+        { nome: "5.2 Refatoração de Integrações (WebHooks)", deps: "1.1", tasks: [{ id: "5.2.1", desc: "Alterar hooks para tratamento adequado de CNPJ", h: 2, deps: "1.1.2" }, { id: "5.2.2", desc: "Executar testes de integração das requisições", h: 8, deps: "5.2.1" }] }
     );
 
     EAP_DATA.admin.fases[5].telas.push(
-        { nome: "6.1 Mapeamento", deps: "1.1", tasks: [{ id: "6.1", desc: "Mapeamento técnico de integrações ativas", h: 2, deps: "Nenhuma" }] },
-        { nome: "6.2 Comunicação", deps: "1.1,6.1", tasks: [{ id: "6.2", desc: "Alinhamento técnico e comunicação com parceiros", h: 8, deps: "6.1" }] },
-        { nome: "6.3 Refatoração Requisições", deps: "1.1,6.1", tasks: [{ id: "6.3", desc: "Refatoração do tratamento de requisições e retornos", h: 2, deps: "6.2" }] },
-        { nome: "6.4 Aviso de Erro", deps: "1.1", tasks: [{ id: "6.4", desc: "Implementação de aviso de erro específico (CNPJ Alfa)", h: 2, deps: "6.3" }] }
+        { nome: "6.1 Mapeamento técnico de integrações ativas", deps: "1.1", tasks: [{ id: "6.1", desc: "Mapeamento técnico de integrações ativas", h: 2, deps: "Nenhuma" }] },
+        { nome: "6.2 Alinhamento técnico e comunicação com parceiros", deps: "1.1, 6.1", tasks: [{ id: "6.2", desc: "Alinhamento técnico e comunicação com parceiros", h: 8, deps: "6.1" }] },
+        { nome: "6.3 Refatoração do tratamento de requisições e retornos", deps: "1.1, 6.1", tasks: [{ id: "6.3", desc: "Refatoração do tratamento de requisições e retornos", h: 2, deps: "6.2" }] },
+        { nome: "6.4 Implementação de aviso de erro específico (CNPJ Alfa)", deps: "1.1", tasks: [{ id: "6.4", desc: "Implementação de aviso de erro específico (CNPJ Alfa)", h: 2, deps: "6.3" }] }
     );
-
 
     // ----------- DADOS DO APP -----------
     EAP_DATA.app.fases[0].telas.push(
-        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo application/libraries/DocumentService.php", h: 4, deps: "Nenhuma" }] },
+        { nome: "1.1 Biblioteca Centralizada", deps: "Nenhuma", tasks: [{ id: "1.1.2", desc: "Criar o arquivo application/libraries/DocumentService.php", h: 8, deps: "Nenhuma" }] },
         { nome: "1.2 Ajustar Libs de Validação", deps: "Nenhuma", tasks: [{ id: "1.2.1", desc: "Refatorar as Libs de Validação do CNPJ", h: 4, deps: "Nenhuma" }] }
     );
 
@@ -331,8 +330,7 @@
 
     telasAppList.forEach((nome, idx) => {
         let id = `2.${idx + 3}`;
-        // 🏆 REGRA APLICADA NO APP TAMBÉM:
-        let depsTestes = `1.1.2, 1.2.1, ${id}.1`;
+        let depsTestes = `1.1.2, 1.2.1, ${id}.1`; // A REGRA DE DEPENDÊNCIA DE TESTE APLICADA NO APP
         
         let tarefas = [
             { id: `${id}.1`, desc: "Desenvolver e aplicar máscaras e validação", h: 3, deps: "1.1.2, 1.2.1" },
@@ -404,7 +402,7 @@
     document.getElementById('bar-dev').style.width = devPct + '%'; document.getElementById('bar-qa').style.width = qaPct + '%';
     document.getElementById('pct-dev').innerText = devPct; document.getElementById('pct-qa').innerText = qaPct;
 
-    // A MÁGICA DO TOOLTIP DE DEPENDÊNCIAS
+    // Tooltip Helper
     window.showTooltip = function(e, depsString) {
         e.stopPropagation();
         const tooltip = document.getElementById('custom-tooltip');
